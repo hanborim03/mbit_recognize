@@ -1,8 +1,12 @@
-# 전체 파일 무시
-*
-
-# 파이썬 파일은 무시하지 않음
-!*.py
-
-# HTML 파일도 무시하지 않음
-!*.html
+mbti_1.csv
+개발가능성확인-한보림.hwpx
+venv/
+data/
+coco/
+result/
+model/
+*.jpg
+*.pt
+*.zip
+__pycache__/
+*.pyc
