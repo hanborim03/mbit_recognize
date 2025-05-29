@@ -3,6 +3,7 @@ from transformers import AutoTokenizer, AutoModelForSequenceClassification
 import pickle
 import pandas as pd
 from collections import Counter
+import os
 
 # 데이터 경로
 csv_path = '/home/hanborim/mbti_project/data/merged_data.csv'
@@ -20,23 +21,25 @@ print("NS 분포:", Counter(ns))
 print("TF 분포:", Counter(tf))
 print("JP 분포:", Counter(jp))
 
-# 전체 MBTI(16종) 분류 모델 준비
-MODEL_DIR = "result/bert_multiclass/final_model"
-TOKENIZER_DIR = "result/bert_multiclass/final_tokenizer"
-LABEL_ENCODER_PATH = "result/bert_multiclass/label_encoder.pkl"
+# 전체 MBTI(16종) 분류 모델 준비 (절대경로)
+MODEL_DIR = os.path.abspath("result/bert_multiclass/final_model")
+TOKENIZER_DIR = os.path.abspath("result/bert_multiclass/final_tokenizer")
+LABEL_ENCODER_PATH = os.path.abspath("result/bert_multiclass/label_encoder.pkl")
+
 model = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
 tokenizer = AutoTokenizer.from_pretrained(TOKENIZER_DIR)
 with open(LABEL_ENCODER_PATH, "rb") as f:
     label_encoder = pickle.load(f)
 model.eval()
 
-# 이진 분류 모델 경로 및 로드 (한 번만)
+
+# 이진 분류 모델 경로 및 로드 (한 번만, 절대경로)
 BINARY_AXES = ['IE', 'NS', 'TF', 'JP']
 bin_models = {}
 bin_tokenizers = {}
 for axis in BINARY_AXES:
-    bin_model_dir = f"result/bert_multiclass/final_model_{axis}"
-    bin_tokenizer_dir = f"result/bert_multiclass/final_tokenizer_{axis}"
+    bin_model_dir = os.path.abspath(f"result/bert_multiclass/final_model_{axis}")
+    bin_tokenizer_dir = os.path.abspath(f"result/bert_multiclass/final_tokenizer_{axis}")
     bin_models[axis] = AutoModelForSequenceClassification.from_pretrained(bin_model_dir)
     bin_tokenizers[axis] = AutoTokenizer.from_pretrained(bin_tokenizer_dir)
     bin_models[axis].eval()
@@ -75,6 +78,7 @@ def predict_binary(text):
             'probs': probs.tolist()[0]
         }
     return binary_result
+    
 
 if __name__ == "__main__":
     texts = [
@@ -88,6 +92,7 @@ if __name__ == "__main__":
         # 전체 MBTI 예측
         mbti, conf = predict_mbti(text)
         print(f"[전체 MBTI] 예측: {mbti} (신뢰도: {conf:.4f})")
+        
         # 이진 분류 예측
         binary = predict_binary(text)
         bin_str = ''.join([binary[axis]['pred'] for axis in BINARY_AXES])

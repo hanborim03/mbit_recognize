@@ -91,15 +91,16 @@ eval_dataset.set_format(type='torch', columns=columns)
 
 training_args = TrainingArguments(
     output_dir=os.path.join(RESULT_DIR, 'bert_multiclass'),
-    num_train_epochs=5,
-    per_device_train_batch_size=8,
-    per_device_eval_batch_size=8,
+    num_train_epochs=10,
+    per_device_train_batch_size=16,
+    per_device_eval_batch_size=16,
     eval_strategy="epoch",
     save_strategy="epoch",
     load_best_model_at_end=True,
     metric_for_best_model="accuracy",
     save_total_limit=2,
-    report_to="none"
+    report_to="none",
+    learning_rate=3e-5
 )
 
 def compute_metrics(pred):
@@ -175,15 +176,16 @@ for axis in tqdm(['IE', 'NS', 'TF', 'JP'], desc="Binary Classification Progress"
     model_bin = AutoModelForSequenceClassification.from_pretrained(MODEL_NAME, num_labels=2)
     training_args_bin = TrainingArguments(
         output_dir=os.path.join(RESULT_DIR, f'bert_{axis}'),
-        num_train_epochs=5,
-        per_device_train_batch_size=8,
-        per_device_eval_batch_size=8,
+        num_train_epochs=10,
+        per_device_train_batch_size=16,
+        per_device_eval_batch_size=16,
         eval_strategy="epoch",
         save_strategy="epoch",
         load_best_model_at_end=True,
         metric_for_best_model="accuracy",
         save_total_limit=2,
-        report_to="none"
+        report_to="none",
+        learning_rate=3e-5
     )
 
     trainer_bin = Trainer(
