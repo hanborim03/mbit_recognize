@@ -34,9 +34,6 @@ except ImportError:
 
 # 3. 전체 MBTI(16종) 분류 예측 함수
 def predict_mbti_multiclass(text, model_dir, tokenizer_dir, label_encoder_path, return_label_list=False):
-    import pickle
-    import torch
-    from transformers import AutoModelForSequenceClassification, AutoTokenizer
     model = AutoModelForSequenceClassification.from_pretrained(model_dir)
     tokenizer = AutoTokenizer.from_pretrained(tokenizer_dir)
     with open(label_encoder_path, "rb") as f:
@@ -56,7 +53,42 @@ def predict_mbti_multiclass(text, model_dir, tokenizer_dir, label_encoder_path, 
         else:
             return mbti_pred, conf, prob_list
 
-# 4. 일반화된 생성문 후처리 함수
+# 4. 이진 분류 MBTI 예측 함수 (축별 확률 포함)
+def predict_mbti_binary_with_probs(text):
+    axes = ['IE', 'NS', 'TF', 'JP']
+    axis_map = {
+        'IE': ('I', 'E'),
+        'NS': ('N', 'S'),
+        'TF': ('T', 'F'),
+        'JP': ('J', 'P')
+    }
+    mbti_binary_list = []
+    conf_binary_list = []
+    axis_probs = {}
+
+    for axis in axes:
+        bin_model_dir = os.path.abspath(f"result/bert_multiclass/final_model_{axis}")
+        bin_tokenizer_dir = os.path.abspath(f"result/bert_multiclass/final_tokenizer_{axis}")
+        bin_model = AutoModelForSequenceClassification.from_pretrained(bin_model_dir)
+        bin_tokenizer = AutoTokenizer.from_pretrained(bin_tokenizer_dir)
+        bin_inputs = bin_tokenizer(text, return_tensors="pt", truncation=True, padding="max_length", max_length=256)
+        with torch.no_grad():
+            bin_outputs = bin_model(**bin_inputs)
+            bin_probs = torch.softmax(bin_outputs.logits, dim=1)
+            bin_pred = torch.argmax(bin_probs, dim=1).item()
+            mbti_binary_list.append(axis_map[axis][bin_pred])
+            conf_binary_list.append(bin_probs[0, bin_pred].item())
+            axis_probs[axis] = (
+                bin_probs[0,0].item(),  # 첫 번째 클래스 확률
+                bin_probs[0,1].item(),  # 두 번째 클래스 확률
+                axis_map[axis][bin_pred],  # 예측 축
+                bin_probs[0, bin_pred].item()  # 신뢰도
+            )
+    mbti_binary = ''.join(mbti_binary_list)
+    avg_conf = sum(conf_binary_list) / len(conf_binary_list)
+    return mbti_binary, avg_conf, axis_probs
+
+# 5. 일반화된 생성문 후처리 함수
 def remove_repeated_phrases(text, min_len=2):
     tokens = text.split()
     result = []
@@ -85,7 +117,7 @@ def clean_generated_description(text):
     text = filter_short_sentences(text)
     return text
 
-# 5. 멀티모달 이미지 설명 생성 (생략: 기존 함수 그대로 사용)
+# 6. 멀티모달 이미지 설명 생성 (생략: 기존 함수 그대로 사용)
 from model import load_model_and_tokenizer, SimpleMultimodalModel
 from PIL import Image
 def generate_image_description(image_path, question, model_ckpt="my_multimodal_model_best.pt", model_name="EleutherAI/polyglot-ko-1.3b", tokenizer_dir="my_tokenizer_dir"):
@@ -126,29 +158,3 @@ def generate_image_description(image_path, question, model_ckpt="my_multimodal_m
         )
         description = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return description.strip()
-
-# 6. 전체 통합 실행
-if __name__ == "__main__":
-    # 전체 MBTI(16종) 분류 모델 경로
-    MODEL_DIR = os.path.abspath("result/bert_multiclass/final_model")
-    TOKENIZER_DIR = os.path.abspath("result/bert_multiclass/final_tokenizer")
-    LABEL_ENCODER_PATH = os.path.abspath("result/bert_multiclass/label_encoder.pkl")
-    
-    # 1. 텍스트 기반 MBTI 전체 분류
-    text = "나는 혼자 있는 걸 좋아해."
-    print("=== 텍스트 기반 MBTI 전체 분류 ===")
-    mbti_pred, conf, prob_list = predict_mbti_multiclass(text, MODEL_DIR, TOKENIZER_DIR, LABEL_ENCODER_PATH)
-    print(f"전체 MBTI 예측: {mbti_pred} (신뢰도: {conf:.4f})")
-    print(f"전체 softmax 분포: {prob_list}\n")
-
-    # 2. 이미지 기반 멀티모달 설명 (후처리 및 키워드 추출 포함)
-    image_path = "/home/hanborim/mbti_project/picture.jpg"
-    question = "이 이미지의 분위기를 설명해줘"
-    print("=== 이미지 기반 멀티모달 설명 ===")
-    img_desc = generate_image_description(image_path, question)
-    cleaned_desc = clean_generated_description(img_desc)
-    print("생성된 설명:", cleaned_desc)
-
-    # 3. 명사+형용사(감성 키워드) 추출 (불용어 필터링 적용)
-    keywords = extract_keywords(cleaned_desc, topk=5, stopwords=STOPWORDS)
-    print("주요 키워드:", ', '.join(keywords))
